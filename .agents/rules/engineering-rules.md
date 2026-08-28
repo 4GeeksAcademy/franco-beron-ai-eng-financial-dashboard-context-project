@@ -1,157 +1,139 @@
 # Reglas de Ingenieria del Proyecto
 
-Alcance:
-
-- Estas reglas aplican a todo cambio en backend y frontend.
-- Son obligatorias para codigo nuevo o modificado.
-- Si existe deuda tecnica previa, no bloquea el PR salvo que el archivo tocado quede peor.
-
-## Flujo operativo obligatorio
-
-Antes de abrir PR, validar en este orden:
-
-1. Levantar proyecto:
-
-- docker compose up --build
-
-2. Verificar servicios:
-
-- curl http://localhost:8000/health
-- curl http://localhost:8000/api/metrics | jq 'length'
-- curl -o /dev/null -w '%{http_code}\n' http://localhost:5173
-
-3. Ejecutar pruebas:
-
-- docker compose exec -T backend pytest -q
-- docker compose exec -T frontend npm run test -- --run
-
-4. Criterio de salida:
-
-- Sin errores de runtime en frontend/backend.
-- Todas las pruebas en verde.
-- Reglas 1-10 cumplidas para los archivos modificados.
-
-## 1) Contratos tipados en fronteras publicas
-
-Regla:
-
-- Todo endpoint publico debe declarar response_model.
-- Todo query/filter debe tiparse y, cuando aplique, incluir restricciones (ge/le/required).
-
-Criterio verificable:
-
-- En diff de backend no se aceptan endpoints sin contrato de salida.
-
-## 2) Datos deterministas para demo y pruebas
-
-Regla:
-
-- Cualquier dataset generado para demo/pruebas debe ser reproducible.
-- Las pruebas deben validar forma y orden, no solo status code.
-
-Criterio verificable:
-
-- Si se toca generacion de datos o filtros, se actualiza test de orden/cantidad/valores esperados.
-
-## 3) Logica de negocio en funciones puras reutilizables
-
-Regla:
-
-- Calculos de KPI, agregaciones, filtros y formateos van en helpers puros.
-- Handlers y componentes solo orquestan.
-
-Criterio verificable:
-
-- Nuevos calculos no deben quedar incrustados dentro de JSX complejo o endpoints largos.
-
-## 4) Tests obligatorios por cambio de comportamiento
-
-Regla:
-
-- Cambio de comportamiento backend: actualizar/crear pytest en backend/tests.
-- Cambio de calculo/formato frontend: actualizar/crear vitest en src/lib.
-
-Criterio verificable:
-
-- Ningun PR de logica se aprueba sin test que falle antes y pase despues.
-
-## 5) UX resiliente en vistas asincronas
-
-Regla:
-
-- Toda vista con fetch debe cubrir loading, empty state y error state.
-- Nuevas tarjetas/graficos deben tener fallback visual.
-
-Criterio verificable:
-
-- En revision de UI se puede reproducir cada estado sin romper layout.
-
-## 6) Estrategia de API local consistente
-
-Regla:
-
-- Por defecto usar rutas relativas /api desde frontend.
-- VITE_API_BASE_URL se usa solo como override de entorno.
-
-Criterio verificable:
-
-- No hardcodear host/puerto de backend en componentes.
-
-## 7) CORS seguro por entorno
-
-Regla:
-
-- No usar allow_origins global en produccion.
-- Definir origenes explicitos por entorno.
-
-Criterio verificable:
-
-- Si se toca configuracion de app, se conserva o mejora control de origenes.
-
-## 8) Evitar efectos globales ocultos
-
-Regla:
-
-- Evitar random.seed global en rutas compartidas.
-- Preferir instancias locales de RNG cuando se refactorice generacion.
-
-Criterio verificable:
-
-- Cambios nuevos no deben introducir estado global mutable evitable.
-
-## 9) Coherencia entre periodo mostrado y datos reales
-
-Regla:
-
-- El periodo visible del dashboard debe derivar de datos reales (facets/rango) y no de texto fijo.
-
-Criterio verificable:
-
-- Si se modifica cabecera o filtros temporales, validar que etiqueta y dataset coincidan.
-
-## 10) Limitar crecimiento monolitico
-
-Regla:
-
-- Si un modulo mezcla demasiadas responsabilidades, dividir por dominio.
-- Rutas del backend delgadas; calculo fuera de handlers.
-
-Criterio verificable:
-
-- Nuevos endpoints reutilizan servicios/helpers en lugar de copiar logica.
-
-## Matriz de aplicacion rapida por tipo de cambio
-
-- Cambio en endpoint backend: aplicar reglas 1, 2, 3, 4, 7, 8, 10.
-- Cambio en filtros/periodo/metricas: aplicar reglas 2, 3, 4, 9.
-- Cambio de fetch/UI async: aplicar reglas 5, 6, 9.
-- Refactor sin cambios funcionales: mantener reglas 3 y 10 + pruebas en verde.
-
-## Checklist de PR
-
-- Endpoint nuevo o modificado con contratos tipados y restricciones.
-- Comportamiento cubierto por tests nuevos/actualizados.
-- Estados loading/empty/error verificados en UI asincrona.
-- Sin host hardcodeado en frontend, uso correcto de /api.
-- Riesgos de CORS/estado global no empeoran.
-- Pruebas ejecutadas con comandos de este archivo y resultado en verde.
+## Alcance
+
+- Aplica a todo cambio en `backend/` y `frontend/`.
+- Estas reglas gobiernan codigo nuevo y modificaciones de comportamiento.
+- Si hay deuda previa, el cambio no debe empeorarla en los archivos tocados.
+
+## Regla 1 - Contratos tipados en endpoints FastAPI
+
+- Nombre: Contratos tipados en API
+- Alcance: Endpoints en `backend/app/routes.py` y nuevos modulos de rutas.
+- Justificacion: El backend actual define `response_model` en todos los endpoints publicos y usa tipos `Literal`/Pydantic para el contrato de datos.
+- Instrucciones accionables:
+  - Todo endpoint nuevo/modificado debe incluir `response_model`.
+  - Todo query param debe tener tipo explicito y usar `Query(...)`.
+  - Si aplica, agregar restricciones (`ge`, `le`, requerido con `Query(...)`).
+- Evidencia del repositorio:
+  - `@router.get(..., response_model=...)` en `backend/app/routes.py`.
+  - `limit: int = Query(default=5, ge=1, le=20)` en `backend/app/routes.py`.
+- Ejemplo:
+  - Correcto: `@router.get("/api/metrics/top", response_model=list[TopCategoryItem])`.
+  - Incorrecto: endpoint sin `response_model` y parametros sin `Query`.
+
+## Regla 2 - Datos reproducibles para demo y test
+
+- Nombre: Determinismo de dataset
+- Alcance: Generacion y filtrado de datos en backend.
+- Justificacion: El backend usa `generate_mock_movements(seed=42)` para respuestas repetibles.
+- Instrucciones accionables:
+  - Si se cambia la generacion mock, conservar modo determinista para pruebas.
+  - Si se altera filtro/orden, actualizar tests de cantidad, orden y/o campos.
+- Evidencia del repositorio:
+  - `generate_mock_movements(seed=42)` en endpoints de `backend/app/routes.py`.
+  - Tests de orden y filtros en `backend/tests/test_routes.py`.
+- Ejemplo:
+  - Correcto: agregar test que compare salidas con misma seed.
+
+## Regla 3 - Logica de negocio fuera de handlers/UI
+
+- Nombre: Orquestadores delgados
+- Alcance: Endpoints backend y componentes frontend.
+- Justificacion: El proyecto separa calculos en helpers (`summarize_movements`, `computeKPIs`, `computeMonthlyData`).
+- Instrucciones accionables:
+  - Nuevos calculos van en funciones reutilizables.
+  - Endpoints/componentes deben orquestar, no concentrar toda la logica.
+- Evidencia del repositorio:
+  - Helpers y endpoints en `backend/app/routes.py`.
+  - Utilidades en `frontend/src/lib/financial-utils.ts`.
+  - `App.tsx` consume utilidades, no recalcula metricas inline.
+- Ejemplo:
+  - Correcto: agregar calculo en `frontend/src/lib/financial-utils.ts` y test asociado.
+
+## Regla 4 - Tests obligatorios en cambios de comportamiento
+
+- Nombre: Cobertura de comportamiento
+- Alcance: Cambios funcionales en backend y frontend.
+- Justificacion: Hay suites activas de pytest y vitest que cubren comportamientos concretos.
+- Instrucciones accionables:
+  - Cambio de backend: ajustar/crear tests en `backend/tests/`.
+  - Cambio de calculo/formato frontend: ajustar/crear tests en `frontend/src/lib/`.
+- Evidencia del repositorio:
+  - `backend/tests/test_routes.py`.
+  - `frontend/src/lib/financial-utils.test.ts`.
+- Ejemplo:
+  - Correcto: cambio en formula de margen -> actualizar expectativas en `financial-utils.test.ts`.
+
+## Regla 5 - Resiliencia UI para estados asincronos
+
+- Nombre: Loading/empty/error obligatorios
+- Alcance: Vistas frontend que dependen de fetch.
+- Justificacion: La UI actual ya cubre estos estados en dashboard.
+- Instrucciones accionables:
+  - Mantener estado `loading` y skeletons.
+  - Mantener fallback de estado vacio en graficos.
+  - Mantener manejo de error visible cuando falla API.
+- Evidencia del repositorio:
+  - `loading` y `catch` en `frontend/src/App.tsx`.
+  - Skeleton en `frontend/src/components/dashboard/kpi-card.tsx`.
+  - Empty state en charts de `frontend/src/components/dashboard/`.
+- Ejemplo:
+  - Correcto: nuevo grafico incluye skeleton y mensaje de no data.
+
+## Regla 6 - Estrategia de API en frontend
+
+- Nombre: Rutas relativas con override controlado
+- Alcance: Llamadas HTTP del frontend.
+- Justificacion: El frontend usa `/api` y Vite proxy a `backend:8000`; `VITE_API_BASE_URL` es override opcional.
+- Instrucciones accionables:
+  - Usar rutas relativas `/api/...` por defecto.
+  - Usar `VITE_API_BASE_URL` solo para override de entorno.
+  - No hardcodear host/puerto en componentes.
+- Evidencia del repositorio:
+  - `frontend/src/App.tsx`.
+  - `frontend/vite.config.ts`.
+  - `frontend/.env.example`.
+- Ejemplo:
+  - Correcto: `fetch(`${API_BASE_URL}/api/metrics`)`.
+
+## Regla 7 - CORS no mas permisivo que el estado actual
+
+- Nombre: Control de CORS por entorno
+- Alcance: Configuracion de FastAPI en `backend/app/main.py`.
+- Justificacion: El estado actual usa comodines (`*`), lo cual es riesgo conocido.
+- Instrucciones accionables:
+  - Si se toca CORS, no ampliar permisos.
+  - Preferir origenes explicitos por entorno cuando se introduzca configuracion de despliegue.
+- Evidencia del repositorio:
+  - `allow_origins=["*"]`, `allow_methods=["*"]`, `allow_headers=["*"]` en `backend/app/main.py`.
+- Ejemplo:
+  - Correcto: migrar a lista de origenes por variable de entorno.
+
+## Regla 8 - Evitar inconsistencias visibles de periodo
+
+- Nombre: Periodo UI consistente
+- Alcance: Header/filtros de tiempo del dashboard.
+- Justificacion: Existen dos literales de periodo y el backend genera fechas dinamicas por `date.today()`.
+- Instrucciones accionables:
+  - Evitar duplicar literales de periodo en varios componentes.
+  - Si se modifica el periodo mostrado, derivarlo de filtros/datos activos.
+- Evidencia del repositorio:
+  - `frontend/src/App.tsx` y `frontend/src/components/dashboard/dashboard-header.tsx`.
+  - Logica de fechas en `backend/app/routes.py`.
+- Ejemplo:
+  - Correcto: centralizar una sola fuente de periodo en frontend.
+
+## Flujo de verificacion recomendado
+
+1. Levantar servicios:
+   - `docker compose up --build -d`
+2. Smoke checks:
+   - `curl http://localhost:8000/health`
+   - `curl -o /dev/null -w '%{http_code}\n' http://localhost:5173`
+3. Pruebas y calidad:
+   - `docker compose run --rm backend pytest -q`
+   - `docker compose run --rm frontend npm run test -- --run`
+   - `docker compose run --rm frontend npm run lint`
+4. Cierre:
+   - `docker compose down`

@@ -16,6 +16,13 @@ def test_generate_mock_movements_returns_full_year_sorted_data():
     assert movements == sorted(movements, key=lambda item: item.create_date)
 
 
+def test_generate_mock_movements_with_same_seed_is_deterministic():
+    first = generate_mock_movements(seed=42)
+    second = generate_mock_movements(seed=42)
+
+    assert first == second
+
+
 def test_filter_movements_by_date_includes_range_edges():
     movements = generate_mock_movements(seed=42)
     target_date = movements[0].create_date
