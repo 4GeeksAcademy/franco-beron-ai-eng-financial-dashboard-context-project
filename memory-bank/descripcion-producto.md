@@ -1,35 +1,28 @@
-# Descripcion del producto
+# Product Overview (verificado)
 
-## Resumen
+Fecha de actualizacion: 2026-08-28
 
-Este proyecto implementa un dashboard de metricas financieras con frontend web y backend API.
+## HECHO / VERIFICADO
 
-## Objetivo
+- Es un dashboard de metricas financieras con frontend React+TypeScript y backend FastAPI.
+  - Evidencia: `frontend/src/App.tsx`, `backend/app/main.py`, `README.md`.
+- La pantalla principal muestra 4 KPIs: Total Income, Total Outcome, Profit y Profit Margin.
+  - Evidencia: `frontend/src/components/dashboard/kpi-row.tsx`.
+- La UI incluye 2 graficos: Income vs Outcome y Profit Margin %.
+  - Evidencia: `frontend/src/components/dashboard/income-outcome-chart.tsx`, `frontend/src/components/dashboard/profit-percent-chart.tsx`.
+- El backend expone endpoints de salud y metricas (base, facets, summary, top categories, comparison, alerts, b2b, b2c).
+  - Evidencia: `backend/app/routes.py`.
+- La fuente de datos actual del backend es mock y determinista por seed fija en endpoints.
+  - Evidencia: `generate_mock_movements(seed=42)` en `backend/app/routes.py`.
 
-Permitir visualizar rapidamente indicadores ejecutivos de ingresos, egresos y rentabilidad a partir de movimientos financieros simulados.
+## INCOMPLETO
 
-## Problema que resuelve
+- No se observa persistencia en base de datos; los datos se generan en memoria por request.
+  - Evidencia: ausencia de cliente DB y uso de funciones de generacion en `backend/app/routes.py`.
+- El periodo visible del dashboard permanece como literal fijo en frontend.
+  - Evidencia: `frontend/src/components/dashboard/dashboard-header.tsx`.
 
-Centraliza en una sola vista:
+## DESCONOCIDO
 
-- KPIs principales de negocio.
-- Evolucion mensual de ingresos y egresos.
-- Margen de ganancia en el tiempo.
-- Endpoints adicionales para filtros, comparaciones y alertas.
-
-## Alcance funcional actual
-
-- Vista principal con:
-  - Total Income.
-  - Total Outcome.
-  - Profit.
-  - Profit Margin.
-- Graficos de series temporales:
-  - Income vs Outcome.
-  - Profit Margin porcentaje.
-- API para movimientos, facets, resumen por periodo, top categorias, comparacion, alertas y segmentos B2B/B2C.
-
-## Usuarios objetivo
-
-- Estudiantes y equipos tecnicos que practican analisis de producto y calidad de codigo asistidos por IA.
-- Desarrolladores que necesitan un proyecto base para evolucionar funcionalidades de analitica financiera.
+- No hay evidencia directa en el repositorio de usuarios finales reales, volumen de uso o contexto de negocio productivo.
+- No hay evidencia de despliegue productivo o SLA operativos en archivos del repo.
